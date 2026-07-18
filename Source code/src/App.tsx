@@ -103,6 +103,8 @@ export default function App() {
   useEffect(() => {
     if (token) {
       loadUserProfile();
+    } else {
+      handleAutoLogin();
     }
   }, [token]);
 
@@ -122,6 +124,45 @@ export default function App() {
   };
 
   // --- AUTH OPERATIONS ---
+  const handleAutoLogin = async () => {
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'alice@example.com', password: 'password123' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('doc_editor_token', data.token);
+        setToken(data.token);
+        setUser(data.user);
+      }
+    } catch (err) {
+      console.error('Auto login failed:', err);
+    }
+  };
+
+  const handleSwitchUser = async (email: string) => {
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'password123' })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('doc_editor_token', data.token);
+        setToken(data.token);
+        setUser(data.user);
+        setActiveDocument(null);
+        showNotification('success', `Switched workspace to ${data.user.name}`);
+      }
+    } catch (err) {
+      showNotification('error', 'Failed to switch user session');
+    }
+  };
+
   const loadUserProfile = async () => {
     try {
       const res = await fetch('/api/me', {
@@ -134,11 +175,11 @@ export default function App() {
         setUser(data);
       } else {
         // Token expired or invalid
-        handleLogout();
+        handleAutoLogin();
       }
     } catch (err) {
       console.error('Failed to authenticate user token:', err);
-      handleLogout();
+      handleAutoLogin();
     }
   };
 
@@ -669,132 +710,19 @@ export default function App() {
 
       {!user ? (
         // ==========================================
-        // LOGIN PAGE VIEW (AUTHENTICATION)
+        // WORKSPACE PREVIEW LOADING SKELETON
         // ==========================================
-        <div id="login_screen" className="flex-1 flex flex-col md:flex-row min-h-screen items-stretch bg-[#fafbfd]">
-          {/* Aesthetic Brand Hero Sidebar */}
-          <div className="hidden lg:flex flex-col justify-between w-[440px] shrink-0 bg-indigo-950 p-12 text-indigo-100 relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(99,102,241,0.2),transparent)]" />
-            <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-[80px]" />
-
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="bg-indigo-500/10 border border-indigo-500/30 p-2 rounded-xl text-indigo-300">
-                <FileText className="w-5.5 h-5.5 animate-pulse" />
-              </div>
-              <span className="font-semibold text-lg tracking-wide font-mono text-white">ShareDoc.io</span>
+        <div id="loading_screen" className="flex-1 flex flex-col justify-center items-center bg-slate-50 min-h-screen">
+          <div className="flex flex-col items-center gap-4">
+            <div className="bg-indigo-600 text-white p-3 rounded-2xl animate-bounce shadow-md">
+              <FileText className="w-8 h-8" />
             </div>
-
-            <div className="relative z-10 space-y-4">
-              <h1 className="text-3xl font-bold tracking-tight text-white leading-tight">
-                Collaborative Document Workspace
-              </h1>
-              <p className="text-sm text-indigo-200/80 leading-relaxed">
-                Create elegant rich-text documents, organize file structures, import text configurations, and share seamlessly with peers in a real-time developer preview.
-              </p>
+            <div className="text-center">
+              <h3 className="font-bold text-slate-800 text-sm">Synchronizing ShareDoc.io...</h3>
+              <p className="text-xs text-slate-400 mt-1 font-mono">Establishing secure connection to sandbox</p>
             </div>
-
-            <div className="relative z-10 pt-8 border-t border-indigo-900 flex justify-between text-xs text-indigo-300 font-mono">
-              <span>PRD Specs Verified</span>
-              <span>v1.0 (PostgreSQL Core)</span>
-            </div>
-          </div>
-
-          {/* Core Access Panel */}
-          <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12">
-            <div className="w-full max-w-md space-y-8">
-              {/* Login Title */}
-              <div className="text-center md:text-left">
-                <div className="flex items-center gap-2.5 justify-center md:justify-start lg:hidden mb-6">
-                  <div className="bg-indigo-600/10 border border-indigo-500/20 p-2 rounded-xl text-indigo-600">
-                    <FileText className="w-5.5 h-5.5" />
-                  </div>
-                  <span className="font-bold text-lg text-slate-900 font-mono">ShareDoc.io</span>
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Access Your Workspace</h2>
-                <p className="text-sm text-slate-500 mt-1.5">Sign in to edit, compile, and distribute collaborative papers.</p>
-              </div>
-
-              {/* Login Form */}
-              <form onSubmit={handleLogin} className="space-y-4">
-                {authError && (
-                  <div className="bg-rose-50 border border-rose-100 text-rose-700 text-xs px-3 py-2.5 rounded-xl flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-                    <span>{authError}</span>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="name@example.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-2.5 text-sm transition"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between">
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</label>
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-2.5 text-sm transition"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isAuthenticating}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium text-sm py-2.5 rounded-xl transition shadow-sm hover:shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isAuthenticating ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Authenticating...
-                    </>
-                  ) : (
-                    'Enter Workspace'
-                  )}
-                </button>
-              </form>
-
-              {/* Seeded credentials quick-select list */}
-              <div className="space-y-3 pt-6 border-t border-slate-150">
-                <div className="flex items-center gap-1.5 text-slate-500">
-                  <HelpCircle className="w-4 h-4" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">Seeded Accounts for Testing</span>
-                </div>
-                <p className="text-[11px] text-slate-400">Click any account below to instantly pre-fill credentials for quick evaluation:</p>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {seededAccounts.map((acc, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => quickSelectAccount(acc.email)}
-                      className={`text-left p-2.5 border rounded-xl transition text-xs flex flex-col justify-between ${
-                        loginEmail === acc.email 
-                          ? 'border-indigo-500 bg-indigo-50/40 text-indigo-950 shadow-sm' 
-                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center w-full">
-                        <span className="font-semibold">{acc.name}</span>
-                        {loginEmail === acc.email && <UserCheck className="w-3.5 h-3.5 text-indigo-600" />}
-                      </div>
-                      <span className="text-[10px] text-slate-400 mt-1 font-mono break-all">{acc.email}</span>
-                      <span className="text-[9px] bg-slate-100 text-slate-500 font-medium px-1.5 py-0.5 rounded mt-1.5 self-start">{acc.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="w-48 h-1 bg-slate-200 rounded-full overflow-hidden mt-2 relative">
+              <div className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full animate-pulse w-full" />
             </div>
           </div>
         </div>
@@ -820,26 +748,37 @@ export default function App() {
               </div>
             </div>
 
-            {/* Profile actions */}
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-2.5 text-right">
-                <div>
-                  <p className="text-xs font-semibold text-slate-800">{user.name}</p>
-                  <p className="text-[10px] font-mono text-slate-400">{user.email}</p>
-                </div>
-                <div className="w-8.5 h-8.5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm border border-indigo-200">
-                  {user.name.charAt(0)}
-                </div>
+            {/* Profile actions / Quick Switcher */}
+            <div className="flex items-center gap-3">
+              {/* Quick Switch Persona Label */}
+              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-inner">
+                <span className="text-[10px] uppercase font-bold text-slate-400 px-2 font-mono hidden md:inline">Persona:</span>
+                {seededAccounts.map((acc, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSwitchUser(acc.email)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      user.email === acc.email
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 font-medium'
+                    }`}
+                    title={`Switch session to ${acc.name} (${acc.desc})`}
+                  >
+                    <span>{acc.name.split(' ')[0]}</span>
+                  </button>
+                ))}
               </div>
 
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-600 transition"
-                title="Logout from workspace"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Logout</span>
-              </button>
+              {/* Current User Badge */}
+              <div className="flex items-center gap-2 bg-indigo-50/50 border border-indigo-100 rounded-xl px-2.5 py-1.5">
+                <div className="w-6.5 h-6.5 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  {user.name.charAt(0)}
+                </div>
+                <div className="hidden lg:block text-left">
+                  <p className="text-[10px] font-bold text-slate-800 leading-none">{user.name}</p>
+                  <p className="text-[8px] font-mono text-slate-400 leading-none mt-0.5">{user.email}</p>
+                </div>
+              </div>
             </div>
           </header>
 
