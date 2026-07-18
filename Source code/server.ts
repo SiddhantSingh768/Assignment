@@ -13,6 +13,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
+import fs from 'fs';
+
+// Request logger middleware
+app.use((req, res, next) => {
+  const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - Headers: ${JSON.stringify(req.headers)}\n`;
+  try {
+    fs.appendFileSync(path.join(__dirname, 'server.log'), logLine);
+  } catch (err) {
+    console.error('Failed to write to server.log:', err);
+  }
+  console.log(`[SERVER LOG] ${req.method} ${req.url}`);
+  next();
+});
+
 // In-Memory Active Sessions (token -> userId)
 const activeSessions = new Map<string, string>();
 
@@ -380,25 +394,11 @@ if (process.env.NODE_ENV === 'production') {
   app.use(vite.middlewares);
 }
 
-const DEFAULT_PORT = Number(process.env.PORT) || 3000;
-const MAX_PORT_TRIES = 10;
-
-function startServer(port: number, attempt = 1) {
-  const server = app.listen(port, '0.0.0.0', () => {
-    console.log(`Server is running at http://0.0.0.0:${port}`);
-  });
-
-  server.on('error', (error: NodeJS.ErrnoException) => {
-    if (error.code === 'EADDRINUSE' && attempt < MAX_PORT_TRIES) {
-      const nextPort = port + 1;
-      console.warn(`Port ${port} is busy. Retrying on ${nextPort}...`);
-      startServer(nextPort, attempt + 1);
-      return;
-    }
-
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  });
-}
-
-startServer(DEFAULT_PORT);
+const PORT = 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  const startupLog = `\n[${new Date().toISOString()}] SERVER STARTUP - NODE_ENV: ${process.env.NODE_ENV} - PORT: ${PORT}\n`;
+  try {
+    fs.appendFileSync(path.join(__dirname, 'server.log'), startupLog);
+  } catch (err) {}
+  console.log(`Server is running at http://0.0.0.0:${PORT}`);
+});
