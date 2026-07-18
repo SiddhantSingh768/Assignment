@@ -1,0 +1,30 @@
+{
+  "users": [
+    {
+      "id": "user-alice-id",
+      "name": "Alice Smith",
+      "email": "alice@example.com",
+      "passwordHash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
+    },
+    {
+      "id": "user-bob-id",
+      "name": "Bob Jones",
+      "email": "bob@example.com",
+      "passwordHash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
+    },
+    {
+      "id": "user-siddhant-id",
+      "name": "Siddhant Singh",
+      "email": "siddhant@example.com",
+      "passwordHash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
+    },
+    {
+      "id": "user-reviewer-id",
+      "name": "Reviewer Account",
+      "email": "reviewer@example.com",
+      "passwordHash": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
+    }
+  ],
+  "documents": [],
+  "sharedDocuments": []
+}

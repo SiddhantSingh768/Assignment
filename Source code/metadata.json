@@ -1,0 +1,6 @@
+{
+  "name": "AI Sandbox Studio",
+  "description": "An elegant, high-fidelity developer workspace and creative playground for testing Gemini, sketching visual ideas, and writing code in real time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
