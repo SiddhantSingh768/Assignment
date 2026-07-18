@@ -101,19 +101,57 @@ export default function App() {
 
   // --- STARTUP LOGIC ---
   useEffect(() => {
-    if (token) {
-      loadUserProfile();
-    } else {
-      handleAutoLogin();
-    }
-  }, [token]);
+    const initializeAuth = async () => {
+      const savedToken = localStorage.getItem('doc_editor_token');
+      if (savedToken) {
+        try {
+          const res = await fetch('/api/me', {
+            headers: {
+              'Authorization': `Bearer ${savedToken}`
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setToken(savedToken);
+            setUser(data);
+            return;
+          } else {
+            console.warn('Saved token was invalid or expired, auto-logging in as Alice...');
+          }
+        } catch (err) {
+          console.error('Failed to verify existing session:', err);
+        }
+      }
+
+      // Auto-login as Alice
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'alice@example.com', password: 'password123' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          localStorage.setItem('doc_editor_token', data.token);
+          setToken(data.token);
+          setUser(data.user);
+        } else {
+          console.error('Auto login response was not ok:', res.status);
+        }
+      } catch (err) {
+        console.error('Auto login network error:', err);
+      }
+    };
+
+    initializeAuth();
+  }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && token) {
       loadWorkspace();
       loadSystemUsers();
     }
-  }, [user]);
+  }, [user, token]);
 
   // --- NOTIFICATION DISPLAY BANNER TIMER ---
   const showNotification = (type: 'success' | 'error', message: string) => {
@@ -124,24 +162,6 @@ export default function App() {
   };
 
   // --- AUTH OPERATIONS ---
-  const handleAutoLogin = async () => {
-    try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'alice@example.com', password: 'password123' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('doc_editor_token', data.token);
-        setToken(data.token);
-        setUser(data.user);
-      }
-    } catch (err) {
-      console.error('Auto login failed:', err);
-    }
-  };
-
   const handleSwitchUser = async (email: string) => {
     try {
       const res = await fetch('/api/login', {
@@ -160,26 +180,6 @@ export default function App() {
       }
     } catch (err) {
       showNotification('error', 'Failed to switch user session');
-    }
-  };
-
-  const loadUserProfile = async () => {
-    try {
-      const res = await fetch('/api/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-      } else {
-        // Token expired or invalid
-        handleAutoLogin();
-      }
-    } catch (err) {
-      console.error('Failed to authenticate user token:', err);
-      handleAutoLogin();
     }
   };
 
