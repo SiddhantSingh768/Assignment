@@ -51,6 +51,7 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   // --- SEEDED ACCOUNTS ---
   const seededAccounts = [
@@ -100,49 +101,56 @@ export default function App() {
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- STARTUP LOGIC ---
-  useEffect(() => {
-    const initializeAuth = async () => {
-      const savedToken = localStorage.getItem('doc_editor_token');
-      if (savedToken) {
-        try {
-          const res = await fetch('/api/me', {
-            headers: {
-              'Authorization': `Bearer ${savedToken}`
-            }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setToken(savedToken);
-            setUser(data);
-            return;
-          } else {
-            console.warn('Saved token was invalid or expired, auto-logging in as Alice...');
-          }
-        } catch (err) {
-          console.error('Failed to verify existing session:', err);
-        }
-      }
-
-      // Auto-login as Alice
+  const initializeAuth = async () => {
+    setInitError(null);
+    const savedToken = localStorage.getItem('doc_editor_token');
+    if (savedToken) {
       try {
-        const res = await fetch('/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'alice@example.com', password: 'password123' })
+        const res = await fetch('/api/me', {
+          headers: {
+            'Authorization': `Bearer ${savedToken}`
+          }
         });
         if (res.ok) {
           const data = await res.json();
-          localStorage.setItem('doc_editor_token', data.token);
-          setToken(data.token);
-          setUser(data.user);
+          setToken(savedToken);
+          setUser(data);
+          return;
         } else {
-          console.error('Auto login response was not ok:', res.status);
+          console.warn('Saved token was invalid or expired, clearing and auto-logging in as Alice...');
+          localStorage.removeItem('doc_editor_token');
+          setToken(null);
         }
       } catch (err) {
-        console.error('Auto login network error:', err);
+        console.error('Failed to verify existing session:', err);
       }
-    };
+    }
 
+    // Auto-login as Alice
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'alice@example.com', password: 'password123' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('doc_editor_token', data.token);
+        setToken(data.token);
+        setUser(data.user);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error || `Server status: ${res.status}`;
+        console.error('Auto login response was not ok:', errMsg);
+        setInitError(`Auto-login failed: ${errMsg}`);
+      }
+    } catch (err: any) {
+      console.error('Auto login network error:', err);
+      setInitError(`Connection error: ${err.message || 'The sandbox environment is starting up.'}`);
+    }
+  };
+
+  useEffect(() => {
     initializeAuth();
   }, []);
 
@@ -712,18 +720,63 @@ export default function App() {
         // ==========================================
         // WORKSPACE PREVIEW LOADING SKELETON
         // ==========================================
-        <div id="loading_screen" className="flex-1 flex flex-col justify-center items-center bg-slate-50 min-h-screen">
-          <div className="flex flex-col items-center gap-4">
-            <div className="bg-indigo-600 text-white p-3 rounded-2xl animate-bounce shadow-md">
-              <FileText className="w-8 h-8" />
+        <div id="loading_screen" className="flex-1 flex flex-col justify-center items-center bg-slate-50 min-h-screen p-6 animate-fadeIn">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 p-8 flex flex-col items-center">
+            <div className="bg-indigo-600 text-white p-3 rounded-2xl animate-bounce shadow-md mb-6">
+              <FileText className="w-7 h-7" />
             </div>
-            <div className="text-center">
-              <h3 className="font-bold text-slate-800 text-sm">Synchronizing ShareDoc.io...</h3>
-              <p className="text-xs text-slate-400 mt-1 font-mono">Establishing secure connection to sandbox</p>
+            
+            <div className="text-center space-y-1 mb-6">
+              <h3 className="font-bold text-slate-800 text-base">Synchronizing ShareDoc.io...</h3>
+              <p className="text-xs text-slate-400 font-mono">Establishing secure connection to sandbox</p>
             </div>
-            <div className="w-48 h-1 bg-slate-200 rounded-full overflow-hidden mt-2 relative">
-              <div className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full animate-pulse w-full" />
-            </div>
+
+            {initError ? (
+              <div className="w-full space-y-5">
+                <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl text-rose-800 text-xs text-center space-y-1">
+                  <p className="font-semibold">Unable to establish connection</p>
+                  <p className="text-rose-600/90 font-mono leading-relaxed break-words">{initError}</p>
+                </div>
+
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => initializeAuth()}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-xs py-2.5 rounded-xl transition shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Retry Connecting Now</span>
+                  </button>
+
+                  <div className="relative flex py-2 items-center">
+                    <div className="flex-grow border-t border-slate-150"></div>
+                    <span className="flex-shrink mx-3 text-[10px] text-slate-400 font-mono uppercase tracking-wider">Or Quick Connect</span>
+                    <div className="flex-grow border-t border-slate-150"></div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {seededAccounts.map((acc, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSwitchUser(acc.email)}
+                        className="p-2.5 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20 rounded-xl text-left transition text-xs flex flex-col justify-between"
+                      >
+                        <span className="font-bold text-slate-800">{acc.name.split(' ')[0]}</span>
+                        <span className="text-[9px] text-slate-400 mt-0.5 truncate">{acc.email}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full space-y-4">
+                <div className="w-48 h-1 bg-slate-200 rounded-full overflow-hidden mx-auto relative">
+                  <div className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full animate-pulse w-full" />
+                </div>
+                <p className="text-[11px] text-slate-400 text-center font-mono leading-relaxed">
+                  Authenticating user session profile...
+                </p>
+              </div>
+            )}
           </div>
         </div>
       ) : (
